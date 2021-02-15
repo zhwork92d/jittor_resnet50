@@ -12,6 +12,7 @@ Reference:
 import jittor as jt
 from jittor import init
 from jittor import nn
+from jittor import Function
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -60,18 +61,19 @@ class Bottleneck(nn.Module):
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion*planes:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes,
+                nn.Conv(in_planes, self.expansion*planes,
                           kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm(self.expansion*planes)
             )
+        self.relu = nn.Relu() 
 
     #def forward(self, x):
     def execute(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = F.relu(self.bn2(self.conv2(out)))
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn2(self.conv2(out)))
         out = self.bn3(self.conv3(out))
         out += self.shortcut(x)
-        out = F.relu(out)
+        out = self.relu(out)
         return out
 
 
@@ -89,6 +91,9 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
         self.linear = nn.Linear(512*block.expansion, num_classes)
+        self.relu = nn.Relu() #add
+        #self.avg_pool2d = nn.Pool(kernel_size=3)#add
+        self.avg_pool2d = nn.AdaptiveAvgPool2d((1, 1))
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -100,12 +105,16 @@ class ResNet(nn.Module):
 
     #def forward(self, x):
     def execute(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(x)))
+        #out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        #out = nn.Pool(out, 4)
+        #out = nn.Pool(kernel_size=1)(out, 4)
+        out = self.avg_pool2d(out)
+        #out = self.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         return out
@@ -132,9 +141,8 @@ def ResNet152():
 
 
 def test():
-    net = ResNet18()
-    y = net(jt.rand(1, 3, 32, 32))
-    #y = net(torch.randn(1, 3, 32, 32))
+    net = ResNet50()
+    y = net(jt.random([1, 3, 32, 32]))
     print(y.size())
 
 test()
